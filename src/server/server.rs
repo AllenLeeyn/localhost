@@ -1,10 +1,10 @@
-use std::net::{TcpListener, SocketAddr};
 use std::io::{self, ErrorKind};
+use std::net::{SocketAddr, TcpListener};
 use std::{thread, time::Duration};
 
-use crate::Config;
+use crate::core::{Request, Response};
 use crate::ClientConnection;
-use crate::core::{Response, Request};
+use crate::Config;
 
 #[derive(Debug)]
 pub struct ServerSocket {
@@ -18,7 +18,11 @@ impl ServerSocket {
         let listener = TcpListener::bind(addr)?;
         listener.set_nonblocking(true)?;
         println!("[+] Bound to {}", addr);
-        Ok(Self { addr, listener, client_timeout })
+        Ok(Self {
+            addr,
+            listener,
+            client_timeout,
+        })
     }
 
     /// Accepts all pending connections (non-blocking), returns any new clients.
@@ -28,7 +32,10 @@ impl ServerSocket {
         loop {
             match self.listener.accept() {
                 Ok((stream, peer_addr)) => {
-                    println!("[*] Accepted connection from {} on {}", peer_addr, self.addr);
+                    println!(
+                        "[*] Accepted connection from {} on {}",
+                        peer_addr, self.addr
+                    );
                     match ClientConnection::new(stream, peer_addr, self.client_timeout) {
                         Ok(client) => new_clients.push(client),
                         Err(e) => eprintln!("[!] Failed to create client connection: {}", e),
@@ -53,6 +60,7 @@ impl ServerSocket {
 pub struct Server {
     sockets: Vec<ServerSocket>,
     clients: Vec<ClientConnection>,
+    config: Config,
 }
 
 impl Server {
@@ -63,7 +71,10 @@ impl Server {
             for &port in &server.ports {
                 let addr_str = format!("{}:{}", server.server_address, port);
                 match addr_str.parse::<SocketAddr>() {
-                    Ok(addr) => match ServerSocket::try_bind(addr, Duration::from_secs(server.client_timeout_secs)) {
+                    Ok(addr) => match ServerSocket::try_bind(
+                        addr,
+                        Duration::from_secs(server.client_timeout_secs),
+                    ) {
                         Ok(socket) => sockets.push(socket),
                         Err(e) => eprintln!("[!] Failed to bind {}: {}", addr, e),
                     },
@@ -79,14 +90,17 @@ impl Server {
         Ok(Server {
             sockets,
             clients: Vec::new(),
+            config: config.clone(),
         })
     }
 
     fn build_response(&self, request: &Request) -> Response {
         // Very simple placeholder
-        Response::new(200, "OK")
-            .header("Content-Type", "text/plain")
-            .with_body("Hello, world!")
+        // Response::new(200, "OK")
+        //     .header("Content-Type", "text/plain")
+        //     .with_body("Hello, world!")
+        let root = &self.config.servers[0].root;
+        crate::server::handler::static_handler::serve_file(root.as_path(), &request.uri)
     }
 
     fn handle_client(&mut self, client: &mut ClientConnection) -> io::Result<bool> {
@@ -105,7 +119,10 @@ impl Server {
                 client.refresh_activity();
 
                 if let Some(request) = client.parse_request() {
-                    println!("--- Parsed Request from {} ---\n{:#?}", client.peer_addr, request);
+                    println!(
+                        "--- Parsed Request from {} ---\n{:#?}",
+                        client.peer_addr, request
+                    );
 
                     let response = self.build_response(&request);
                     client.send_response(response)?; // Clean + readable
@@ -149,7 +166,7 @@ impl Server {
             }
         }
     }
-    
+
     pub fn run(&mut self) {
         loop {
             self.poll();

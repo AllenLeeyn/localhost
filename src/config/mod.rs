@@ -1,16 +1,17 @@
 use serde::Deserialize;
 use std::{fs, path::Path};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub servers: Vec<ServerConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
     pub server_address: String,
     pub ports: Vec<u16>,
     pub server_name: Option<String>,
+    pub root: std::path::PathBuf,
 
     #[serde(default = "default_timeout_secs")]
     pub client_timeout_secs: u64,
@@ -34,11 +35,11 @@ impl Config {
     }
 
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read config: {}", e))?;
+        let content =
+            fs::read_to_string(path).map_err(|e| format!("Failed to read config: {}", e))?;
 
-        let config: Config = toml::from_str(&content)
-            .map_err(|e| format!("Failed to parse TOML: {}", e))?;
+        let config: Config =
+            toml::from_str(&content).map_err(|e| format!("Failed to parse TOML: {}", e))?;
 
         config.validate()?; // Run validation here
 
