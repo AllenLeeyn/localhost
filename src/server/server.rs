@@ -140,7 +140,7 @@ impl ServerHub {
             Some(sock) => sock,
             None => {
                 eprintln!("[!] No socket found for local addr {}", client.local_addr);
-                return Response::generate_error_response(500, "Socket not found.".to_string())
+                return Response::error(500, "Socket not found.".to_string())
                     .header("Connection", "close");
             }
         };
@@ -177,7 +177,7 @@ impl ServerHub {
             }
 
             // Step 4.4: Misconfigured route (no redirect or filename)
-            return Response::generate_error_response(
+            return Response::error(
                 500,
                 "Route is misconfigured (no redirect or file).".to_string(),
             );

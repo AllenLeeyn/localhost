@@ -84,7 +84,7 @@ impl Response {
     }
 
     // Generate html error response
-    pub fn generate_error_response(status_code: u16, reason_message: String) -> Self {
+    pub fn error(status_code: u16, reason_message: String) -> Self {
         let mut defaulting_reason = false;
         let reason = if reason_message.trim().is_empty() {
             defaulting_reason = true;
