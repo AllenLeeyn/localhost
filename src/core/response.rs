@@ -82,4 +82,64 @@ impl Response {
             body: body.into_bytes(),
         }
     }
+
+    // Generate html error response
+    pub fn generate_error_response(status_code: u16, reason_message: String) -> Self {
+        let mut defaulting_reason = false;
+        let reason = if reason_message.trim().is_empty() {
+            defaulting_reason = true;
+            default_reason_phrase(status_code).to_string()
+        } else {
+            reason_message
+        };
+    
+        let title = format!("{} {}", status_code, reason);
+        let paragraph = if defaulting_reason {
+            format!("The server returned status {}.", status_code)
+        } else {
+            reason.clone()
+        };
+        let body = format!(
+            "<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"><title>{title}</title></head>\n<body>\n  <h1>{title}</h1>\n  <p>{paragraph}</p>\n</body>\n</html>\n",
+            title = title,
+            paragraph = paragraph,
+        );
+    
+        Response::new(status_code, &reason)
+            .header("Content-Type", "text/html; charset=utf-8")
+            .with_body(body)
+    }
+}
+
+fn default_reason_phrase(code: u16) -> &'static str {
+    match code {
+        200 => "OK",
+        201 => "Created",
+        202 => "Accepted",
+        204 => "No Content",
+        301 => "Moved Permanently",
+        302 => "Found",
+        303 => "See Other",
+        307 => "Temporary Redirect",
+        308 => "Permanent Redirect",
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        403 => "Forbidden",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        408 => "Request Timeout",
+        409 => "Conflict",
+        410 => "Gone",
+        413 => "Payload Too Large",
+        414 => "URI Too Long",
+        415 => "Unsupported Media Type",
+        418 => "I'm a teapot",
+        429 => "Too Many Requests",
+        500 => "Internal Server Error",
+        501 => "Not Implemented",
+        502 => "Bad Gateway",
+        503 => "Service Unavailable",
+        504 => "Gateway Timeout",
+        _ => "Error",
+    }
 }

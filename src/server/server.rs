@@ -140,10 +140,8 @@ impl ServerHub {
             Some(sock) => sock,
             None => {
                 eprintln!("[!] No socket found for local addr {}", client.local_addr);
-                return Response::new(500, "Internal Server Error")
-                    .header("Content-Type", "text/html")
-                    .header("Connection", "close")
-                    .with_body("<h1>500 Internal Server Error</h1><p>Socket not found.</p>");
+                return Response::generate_error_response(500, "Socket not found.".to_string())
+                    .header("Connection", "close");
             }
         };
 
@@ -159,7 +157,7 @@ impl ServerHub {
 
         // Step 4: Route matching
         if let Some(route_cfg) = config.routes.get(&request.uri) {
-            // ✅ Step 4.1: Check if method is allowed
+            // Step 4.1: Check if method is allowed
             if let Some(allowed_methods) = &route_cfg.methods {
                 if !allowed_methods.iter().any(|m| m.eq_ignore_ascii_case(&request.method)) {
                     let allow_header = allowed_methods.join(", ");
@@ -167,21 +165,22 @@ impl ServerHub {
                 }
             }
 
-            // ✅ Step 4.2: Handle redirect if defined
+            // Step 4.2: Handle redirect if defined
             if let Some(redirect) = &route_cfg.redirect {
                 return Response::redirect(redirect.to.clone(), redirect.code);
             }
 
-            // ✅ Step 4.3: Serve static file if filename is defined
+            // Step 4.3: Serve static file if filename is defined
             if let Some(filename) = &route_cfg.filename {
                 let full_path = root_dir.join(filename);
                 return serve_static_file(&full_path);
             }
 
-            // ✅ Step 4.4: Misconfigured route (no redirect or filename)
-            return Response::new(500, "Internal Server Error")
-                .header("Content-Type", "text/html")
-                .with_body("<h1>500 Internal Server Error</h1><p>Route is misconfigured (no redirect or file).</p>");
+            // Step 4.4: Misconfigured route (no redirect or filename)
+            return Response::generate_error_response(
+                500,
+                "Route is misconfigured (no redirect or file).".to_string(),
+            );
     
         } else {
             // Route not defined in config, but root exists
