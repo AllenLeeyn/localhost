@@ -88,12 +88,12 @@ impl ServerSocket {
 }
 
 #[derive(Debug)]
-pub struct Server {
+pub struct ServerHub {
     sockets: Vec<ServerSocket>,
     clients: Vec<ClientConnection>,
 }
 
-impl Server {
+impl ServerHub {
     pub fn from_config(config: &Config) -> std::io::Result<Self> {
         let mut grouped: HashMap<SocketAddr, Vec<ServerConfig>> = HashMap::new();
 
@@ -128,7 +128,7 @@ impl Server {
             ));
         }
 
-        Ok(Server {
+        Ok(ServerHub {
             sockets,
             clients: Vec::new(),
         })
@@ -255,7 +255,7 @@ impl Server {
                     std::ptr::null(),
                 )
                 };
-                 if result == -1 {
+                if result == -1 {
                     panic!(
                         "[!] Failed to register socket {} with kqueue: {}",
                         fd,
