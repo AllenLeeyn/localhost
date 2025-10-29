@@ -17,5 +17,5 @@ fn main() {
 
     println!("{:#?}", server);
     println!("[*] Server initialized");
-    server.run();
+    server.run(config);
 }

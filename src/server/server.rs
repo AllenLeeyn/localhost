@@ -366,7 +366,7 @@ impl Server {
         }
     }
 
-    pub fn run(&mut self) {
-        run_loop(self);
+    pub fn run(&mut self, config: &ServerConfig) {
+        run_loop(self, config);
     }
 }

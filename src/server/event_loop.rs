@@ -1,7 +1,8 @@
 use std::os::fd::{RawFd, AsRawFd};
 use std::time::Instant;
 use libc::{kqueue, kevent, kevent64_s, EV_ADD, EV_DELETE, EV_ENABLE, EVFILT_READ};
-use crate::server::Server;
+use crate::config;
+use crate::server::{error_response_from_config, Server};
 use crate::core::Response;
 
 /// Create a new kqueue descriptor
@@ -85,7 +86,7 @@ pub fn process_event(server: &mut Server, kqueue: RawFd, ev: &kevent64_s) {
 }
 
 /// Checks for clients that have been idle longer than server.client_timeout and closes them.
-fn cleanup_idle_clients(server: &mut Server) {
+fn cleanup_idle_clients(server: &mut Server, config: &config::ServerConfig) {
     let now = Instant::now();
     server.clients.retain_mut(|client| {
         if let Some(last_req) = client.request_at {
@@ -93,8 +94,7 @@ fn cleanup_idle_clients(server: &mut Server) {
                 eprintln!("Closing client due to request timeout: {}", client.peer_addr);
 
                 // Build 408 response
-                let response = Response::new(408, "Request Timeout")
-                    .with_body("Your request timed out.\n");
+                let response = error_response_from_config(408, config);
 
                 // Attempt to send it
                 let _ = client.send_response(response);
@@ -109,7 +109,7 @@ fn cleanup_idle_clients(server: &mut Server) {
 }
 
 /// The main server event loop
-pub fn run_loop(server: &mut Server) {
+pub fn run_loop(server: &mut Server, config: &config::ServerConfig) {
     let kqueue = create_kqueue();
     register_listeners(server, kqueue);
 
@@ -154,6 +154,6 @@ pub fn run_loop(server: &mut Server) {
         }
 
         // Periodically check for idle clients
-        cleanup_idle_clients(server);
+        cleanup_idle_clients(server, config);
     }
 }
