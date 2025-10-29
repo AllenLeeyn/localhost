@@ -14,6 +14,7 @@ pub struct ClientConnection {
     pub write_registered: bool,
     pub request_at: Option<Instant>,
     pub should_close: bool,
+    pub last_activity: Instant,
 }
 
 impl ClientConnection {
@@ -31,6 +32,7 @@ impl ClientConnection {
             write_registered: false,
             request_at: None,
             should_close: false,
+            last_activity: Instant::now(),
         })
     }
 
@@ -39,7 +41,8 @@ impl ClientConnection {
         let mut temp_buf = [0u8; 4096];
         match self.stream.read(&mut temp_buf) {
             Ok(0) => Ok(0), // Connection closed
-            Ok(n) => {
+                Ok(n) => {
+                self.last_activity = Instant::now();
                 self.read_buffer.extend_from_slice(&temp_buf[..n]);
                 
                 if self.request_at.is_none() {
@@ -73,6 +76,7 @@ impl ClientConnection {
                     return Ok(false);
                 }
                 Ok(n) => {
+                    self.last_activity = Instant::now();
                     self.write_buffer.drain(0..n);
                 }
                 Err(ref e) if e.kind() == ErrorKind::WouldBlock => {

@@ -6,8 +6,13 @@ use std::collections::{HashMap, HashSet};
 pub struct Config {
     pub servers: Vec<ServerConfig>,
     
-    #[serde(default = "default_timeout_secs")]
-    pub client_timeout_secs: u64,
+    /// Maximum time a client can take to send a full request
+    #[serde(default = "default_request_timeout_secs")]
+    pub request_timeout_secs: u64,
+
+    /// Maximum time a client connection can stay idle after last activity
+    #[serde(default = "default_idle_timeout_secs")]
+    pub idle_timeout_secs: u64,
     
     #[serde(default)]
     pub admin: AdminConfig,
@@ -37,8 +42,12 @@ pub struct ServerConfig {
     pub admin_access: bool,
 }
 
-fn default_timeout_secs() -> u64 {
-    30 // default 30 seconds if not specified
+fn default_request_timeout_secs() -> u64 {
+    10 // 10 seconds for request timeout
+}
+
+fn default_idle_timeout_secs() -> u64 {
+    30 // 30 seconds for idle timeout
 }
 
 impl Config {

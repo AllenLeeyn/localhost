@@ -26,7 +26,8 @@ use crate::Config;
 pub struct Server {
     pub sockets: Vec<ServerSocket>,
     pub clients: Vec<ClientConnection>,
-    pub client_timeout: Duration,
+    pub request_timeout: Duration,
+    pub idle_timeout: Duration,
     pub admin: Admin,
 }
 
@@ -49,7 +50,8 @@ impl Server {
             }
         }
 
-        let client_timeout = Duration::from_secs(config.client_timeout_secs);
+        let request_timeout = Duration::from_secs(config.request_timeout_secs);
+        let idle_timeout = Duration::from_secs(config.idle_timeout_secs);
         let mut sockets = Vec::new();
 
         for (addr, configs) in grouped {
@@ -71,7 +73,8 @@ impl Server {
         Ok(Server {
             sockets,
             clients: Vec::new(),
-            client_timeout,
+            request_timeout,
+            idle_timeout,
             admin,
         })
     }
@@ -126,7 +129,7 @@ impl Server {
         error_response_from_config(404, config)
     }
 
-    fn handle_request(&mut self, request: &Request, client: &ClientConnection) -> Response {
+    fn handle_request(&mut self, request: &Request, client: &mut ClientConnection) -> Response {
         // Step 1: Identify which socket the client connected to
         let socket = match self.sockets.iter().find(|s| s.addr == client.local_addr) {
             Some(sock) => sock,
@@ -155,13 +158,18 @@ impl Server {
                 if request.uri == "/login" {
                     if request.method.eq_ignore_ascii_case("POST") {
                         // POST → attempt login
-                        return self.admin.handle_login(request, config);
+                        let response = self.admin.handle_login(request, config);
+                        if response.status_code == 302 {
+                            client.should_close = true;
+                        }
+                        return response;
                     } else {
                         // GET → serve login page
                         return serve_static_file(&root_dir.join("login.html"), config);
                     }
                 } else {
                     // Any other admin route redirect to login
+                    client.should_close = true;
                     return Response::redirect("/login".to_string(), 302);
                 }
             }
@@ -175,6 +183,7 @@ impl Server {
 
         // Step 4: Redirect
         if let Some(redirect) = &route_cfg.redirect {
+            client.should_close = true;
             return Response::redirect(redirect.to.clone(), redirect.code);
         }
 
@@ -248,7 +257,10 @@ impl Server {
     pub fn handle_client_read(&mut self, client: &mut ClientConnection) -> io::Result<bool> {
         match client.read_into_buffer() {
             Ok(0) => {
-                return Ok(false); // connection closed
+                if client.write_buffer.is_empty() {
+                    return Ok(!client.should_close);
+                }
+                return Ok(true);
             }
             Ok(_) => {
                 if let Some(request) = client.parse_request() {
@@ -258,7 +270,7 @@ impl Server {
                         .map(|v| v.eq_ignore_ascii_case("close"))
                         .unwrap_or(false);
 
-                    let response = self.handle_request(&request, &client);
+                    let response = self.handle_request(&request, client);
                     client.queue_response(&response.to_bytes()); // put into write_buffer
                 }
                 Ok(true) // keep connection open

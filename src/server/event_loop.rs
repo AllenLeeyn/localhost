@@ -138,16 +138,31 @@ pub fn process_event(server: &mut Server, kqueue: RawFd, ev: &kevent64_s) {
 fn cleanup_idle_clients(server: &mut Server) {
     let now = Instant::now();
     server.clients.retain_mut(|client| {
-        if let Some(last_req) = client.request_at {
-            if now.duration_since(last_req) > server.client_timeout {
-                eprintln!("Closing client due to request timeout: {}", client.peer_addr);
+        // Check for idle timeout (no recent activity)
+        let idle_duration = now.duration_since(client.last_activity);
+        if idle_duration > server.idle_timeout {
+            eprintln!(
+                "[!] Closing idle client {} after {:?} of inactivity",
+                client.peer_addr, idle_duration
+            );
+            let _ = client.stream.shutdown(std::net::Shutdown::Both);
+            return false; // remove client
+        }
 
-                // Close the connection
+        // Optional: Check for request timeout (client sending too slowly)
+        if let Some(start) = client.request_at {
+            let request_duration = now.duration_since(start);
+            if request_duration > server.request_timeout {
+                eprintln!(
+                    "[!] Closing client {} for slow request ({:?})",
+                    client.peer_addr, request_duration
+                );
                 let _ = client.stream.shutdown(std::net::Shutdown::Both);
-                return false;
+                return false; // remove client
             }
         }
-        true
+
+        true // keep client
     });
 }
 
