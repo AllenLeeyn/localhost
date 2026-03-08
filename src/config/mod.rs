@@ -226,13 +226,22 @@ fn default_redirect_code() -> u16 {
     302 // Default to 302 Found
 }
 
-#[derive(Debug, Default, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct AdminConfig {
     #[serde(default = "default_admin_username")]
     pub username: String,
 
     #[serde(default = "default_admin_password")]
     pub password: String,
+}
+
+impl Default for AdminConfig {
+    fn default() -> Self {
+        Self {
+            username: default_admin_username(),
+            password: default_admin_password(),
+        }
+    }
 }
 
 fn default_admin_username() -> String {
@@ -321,11 +330,15 @@ mod tests {
             [[servers]]
             server_address = "127.0.0.1"
             ports = [8080]
-            root = "   "
+            root = "    "
         "#;
         let config: Config = toml::from_str(toml).unwrap();
         let err = config.validate().unwrap_err();
-        assert!(err.contains("non-empty 'root'"), "expected 'non-empty root' in: {}", err);
+        assert!(
+            err.contains("non-empty 'root'"),
+            "expected 'non-empty root' in: {}",
+            err
+        );
     }
 
     #[test]
@@ -338,7 +351,11 @@ mod tests {
         "#;
         let config: Config = toml::from_str(toml).unwrap();
         let err = config.validate().unwrap_err();
-        assert!(err.contains("does not exist"), "expected 'does not exist' in: {}", err);
+        assert!(
+            err.contains("does not exist"),
+            "expected 'does not exist' in: {}",
+            err
+        );
     }
 
     #[test]
@@ -361,7 +378,11 @@ mod tests {
         );
         let config: Config = toml::from_str(&toml).unwrap();
         let err = config.validate().unwrap_err();
-        assert!(err.contains("Duplicate") && err.contains("8080"), "expected duplicate port in: {}", err);
+        assert!(
+            err.contains("Duplicate") && err.contains("8080"),
+            "expected duplicate port in: {}",
+            err
+        );
     }
 
     #[test]
